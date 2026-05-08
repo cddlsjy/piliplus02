@@ -15,12 +15,14 @@ import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
+import 'package:PiliPlus/utils/remote_control_utils.dart';
 import 'package:flutter/material.dart' hide LayoutBuilder;
+import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
-class HistoryItem extends StatelessWidget {
+class HistoryItem extends StatefulWidget {
   final HistoryItemModel item;
   final MultiSelectBase ctr;
   final void Function(int kid, String business) onDelete;
@@ -31,6 +33,16 @@ class HistoryItem extends StatelessWidget {
     required this.ctr,
     required this.onDelete,
   });
+
+  @override
+  State<HistoryItem> createState() => _HistoryItemState();
+}
+
+class _HistoryItemState extends State<HistoryItem> {
+  bool _hasFocus = false;
+
+  HistoryItemModel get item => widget.item;
+  MultiSelectBase get ctr => widget.ctr;
 
   @override
   Widget build(BuildContext context) {
@@ -47,68 +59,70 @@ class HistoryItem extends StatelessWidget {
             ..enableMultiSelect.value = true
             ..onSelect(item);
 
-    return Material(
-      type: MaterialType.transparency,
-      child: InkWell(
-        onTap: enableMultiSelect
-            ? () => ctr.onSelect(item)
-            : () async {
-                if (business?.contains('article') == true) {
-                  PageUtils.toDupNamed(
-                    '/articlePage',
-                    parameters: {
-                      'id': business == 'article-list'
-                          ? '${item.history.cid}'
-                          : '${item.history.oid}',
-                      'type': 'read',
-                    },
-                  );
-                } else if (business == 'live') {
-                  if (item.liveStatus == 1) {
-                    PageUtils.toLiveRoom(item.history.oid);
-                  } else {
-                    SmartDialog.showToast('直播未开播');
-                  }
-                } else if (business == 'pgc') {
-                  PageUtils.viewPgc(epId: item.history.epid);
-                } else if (business == 'cheese') {
-                  if (item.uri?.isNotEmpty == true) {
-                    PageUtils.viewPgcFromUri(
-                      item.uri!,
-                      isPgc: false,
-                      aid: item.history.oid,
-                    );
-                  }
-                } else {
-                  int? cid = item.history.cid;
-                  Dimension? dimension;
-                  if (cid == null) {
-                    if (await SearchHttp.ab2cWithDimension(
-                          aid: aid,
-                          bvid: bvid,
-                          part: item.history.page,
-                        )
-                        case final res?) {
-                      cid = res.cid;
-                      dimension = res.dimension;
-                    }
-                  }
-                  if (cid != null) {
-                    // TODO: dimension
-                    PageUtils.toVideoPage(
-                      aid: aid,
-                      bvid: bvid,
-                      cid: cid,
-                      cover: item.cover,
-                      title: item.title,
-                      dimension: dimension,
-                    );
-                  }
-                }
-              },
-        onLongPress: onLongPress,
-        onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
-        child: Stack(
+    void onTap() {
+      if (enableMultiSelect) {
+        ctr.onSelect(item);
+        return;
+      }
+      if (business?.contains('article') == true) {
+        PageUtils.toDupNamed(
+          '/articlePage',
+          parameters: {
+            'id': business == 'article-list'
+                ? '${item.history.cid}'
+                : '${item.history.oid}',
+            'type': 'read',
+          },
+        );
+      } else if (business == 'live') {
+        if (item.liveStatus == 1) {
+          PageUtils.toLiveRoom(item.history.oid);
+        } else {
+          SmartDialog.showToast('直播未开播');
+        }
+      } else if (business == 'pgc') {
+        PageUtils.viewPgc(epId: item.history.epid);
+      } else if (business == 'cheese') {
+        if (item.uri?.isNotEmpty == true) {
+          PageUtils.viewPgcFromUri(
+            item.uri!,
+            isPgc: false,
+            aid: item.history.oid,
+          );
+        }
+      } else {
+        _openVideo(aid, bvid);
+      }
+    }
+
+    return Focus(
+      onFocusChange: (hasFocus) {
+        setState(() => _hasFocus = hasFocus);
+      },
+      onKeyEvent: (node, event) {
+        // 遥控器 OK 键 / Enter 键触发点击
+        if (event is KeyDownEvent &&
+            RemoteControlUtils.isSelectKey(event.logicalKey)) {
+          onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: _hasFocus
+            ? RemoteControlUtils.focusedBorderDecoration(
+                colorScheme: theme.colorScheme,
+                borderRadius: 8.0,
+              )
+            : null,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
+            child: Stack(
           clipBehavior: Clip.none,
           children: [
             Padding(
@@ -257,7 +271,35 @@ class HistoryItem extends StatelessWidget {
           ],
         ),
       ),
+    ),
+    ),
     );
+  }
+
+  Future<void> _openVideo(int aid, String bvid) async {
+    int? cid = item.history.cid;
+    Dimension? dimension;
+    if (cid == null) {
+      if (await SearchHttp.ab2cWithDimension(
+            aid: aid,
+            bvid: bvid,
+            part: item.history.page,
+          )
+          case final res?) {
+        cid = res.cid;
+        dimension = res.dimension;
+      }
+    }
+    if (cid != null) {
+      PageUtils.toVideoPage(
+        aid: aid,
+        bvid: bvid,
+        cid: cid,
+        cover: item.cover,
+        title: item.title,
+        dimension: dimension,
+      );
+    }
   }
 
   Widget content(ThemeData theme) {

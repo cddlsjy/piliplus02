@@ -4,9 +4,11 @@ import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/grpc/dyn.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/msg.dart';
+import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/msg/msg_unread_type.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
+import 'package:PiliPlus/models_new/history/data.dart';
 import 'package:PiliPlus/pages/dynamics/controller.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/mine/view.dart';
@@ -14,6 +16,8 @@ import 'package:PiliPlus/services/account_service.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/id_utils.dart';
+import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -21,6 +25,7 @@ import 'package:PiliPlus/utils/update.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
 class MainController extends GetxController
@@ -116,6 +121,55 @@ class MainController extends GetxController
         queryUnreadMsg();
       }
     }
+
+    // 自动续播上次视频
+    _tryResumeLastVideo();
+  }
+
+  /// 尝试恢复上次观看的视频
+  Future<void> _tryResumeLastVideo() async {
+    if (!Pref.autoResumeLastVideo || !accountService.isLogin.value) {
+      return;
+    }
+    // 延迟执行，等首页加载完成
+    Future.delayed(const Duration(milliseconds: 800), () async {
+      if (!accountService.isLogin.value) return;
+      try {
+        final res = await UserHttp.historyList(type: 'all', max: 0, viewAt: 0);
+        if (res case Success(:final response)) {
+          final list = response.list;
+          if (list == null || list.isEmpty) return;
+          final lastItem = list.first;
+          final business = lastItem.history.business;
+          // 只恢复视频类型的历史记录
+          if (business == 'pgc') {
+            if (lastItem.history.epid != null) {
+              PageUtils.viewPgc(
+                epId: lastItem.history.epid,
+              );
+            }
+          } else if (business == 'live') {
+            if (lastItem.liveStatus == 1) {
+              PageUtils.toLiveRoom(lastItem.history.oid);
+            }
+          } else if (business == 'archive' || business == 'ugc') {
+            int? aid = lastItem.history.oid;
+            String bvid = lastItem.history.bvid ?? IdUtils.av2bv(aid!);
+            int? progress = lastItem.progress;
+            // 如果进度为-1表示已看完，不自动续播
+            if (progress == -1 || progress == 0) return;
+            PageUtils.toVideoPage(
+              aid: aid,
+              bvid: bvid,
+              cid: lastItem.history.cid,
+              cover: lastItem.cover,
+              title: lastItem.title,
+              progress: progress,
+            );
+          }
+        }
+      } catch (_) {}
+    });
   }
 
   Future<int> _msgUnread() async {

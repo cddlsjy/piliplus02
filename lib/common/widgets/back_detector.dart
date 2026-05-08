@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart' show kBackMouseButton;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show KeyDownEvent;
+import 'package:flutter/services.dart' show KeyDownEvent, LogicalKeyboardKey;
+import 'package:PiliPlus/utils/remote_control_utils.dart';
 
 class BackDetector extends StatelessWidget {
   const BackDetector({
@@ -19,7 +20,7 @@ class BackDetector extends StatelessWidget {
       canRequestFocus: false,
       onKeyEvent: _onKeyEvent,
       child: Listener(
-        behavior: .translucent,
+        behavior: HitTestBehavior.translucent,
         onPointerDown: _onPointerDown,
         child: child,
       ),
@@ -27,11 +28,12 @@ class BackDetector extends StatelessWidget {
   }
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
-    if (event.logicalKey == .escape && event is KeyDownEvent) {
+    if (event is KeyDownEvent &&
+        RemoteControlUtils.isBackKey(event.logicalKey)) {
       onBack();
-      return .handled;
+      return KeyEventResult.handled;
     }
-    return .ignored;
+    return KeyEventResult.ignored;
   }
 
   void _onPointerDown(PointerDownEvent event) {

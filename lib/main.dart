@@ -335,13 +335,11 @@ class MyApp extends StatelessWidget {
         child: child!,
       );
     }
-    if (PlatformUtils.isDesktop) {
-      return BackDetector(
-        onBack: _onBack,
-        child: child,
-      );
-    }
-    return child;
+    // 所有平台都启用返回键检测（支持遥控器返回键、Escape键、Android返回键）
+    return BackDetector(
+      onBack: _onBack,
+      child: child,
+    );
   }
 
   /// from [DynamicColorBuilderState.initPlatformState]

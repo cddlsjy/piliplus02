@@ -163,6 +163,13 @@ List<SettingsModel> get videoSettings => [
     getSubtitle: () => '当前：${Pref.videoSync}（此项即mpv的--video-sync）',
     onTap: _showVideoSyncDialog,
   ),
+  const SwitchModel(
+    title: '自动续播上次视频',
+    subtitle: '启动App时自动恢复上次观看的视频和进度',
+    leading: Icon(Icons.history_outlined),
+    setKey: SettingBoxKey.autoResumeLastVideo,
+    defaultVal: false,
+  ),
   NormalModel(
     title: '硬解模式',
     leading: const Icon(Icons.memory_outlined),

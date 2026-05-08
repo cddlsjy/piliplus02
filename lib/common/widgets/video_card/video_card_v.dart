@@ -17,12 +17,14 @@ import 'package:PiliPlus/utils/extension/dimension_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
+import 'package:PiliPlus/utils/remote_control_utils.dart';
 import 'package:flutter/material.dart' hide LayoutBuilder;
+import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:intl/intl.dart';
 
 // 视频卡片 - 垂直布局
-class VideoCardV extends StatelessWidget {
+class VideoCardV extends StatefulWidget {
   final BaseRcmdVideoItemModel videoItem;
   final VoidCallback? onRemove;
 
@@ -31,6 +33,15 @@ class VideoCardV extends StatelessWidget {
     required this.videoItem,
     this.onRemove,
   });
+
+  @override
+  State<VideoCardV> createState() => _VideoCardVState();
+}
+
+class _VideoCardVState extends State<VideoCardV> {
+  bool _hasFocus = false;
+
+  BaseRcmdVideoItemModel get videoItem => widget.videoItem;
 
   Future<void> onPushDetail() async {
     switch (videoItem.goto) {
@@ -88,66 +99,94 @@ class VideoCardV extends StatelessWidget {
       cover: videoItem.cover,
       bvid: videoItem.bvid,
     );
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Card(
-          clipBehavior: Clip.hardEdge,
-          child: InkWell(
-            onTap: onPushDetail,
-            onLongPress: onLongPress,
-            onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AspectRatio(
-                  aspectRatio: Style.aspectRatio,
-                  child: LayoutBuilder(
-                    builder: (context, boxConstraints) {
-                      double maxWidth = boxConstraints.maxWidth;
-                      double maxHeight = boxConstraints.maxHeight;
-                      return Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          NetworkImgLayer(
-                            src: videoItem.cover,
-                            width: maxWidth,
-                            height: maxHeight,
-                            type: .emote,
-                          ),
-                          if (videoItem.duration > 0)
-                            PBadge(
-                              bottom: 6,
-                              right: 7,
-                              size: .small,
-                              type: .gray,
-                              text: DurationUtils.formatDuration(
-                                videoItem.duration,
+    final theme = Theme.of(context);
+    return Focus(
+      onFocusChange: (hasFocus) {
+        setState(() => _hasFocus = hasFocus);
+      },
+      onKeyEvent: (node, event) {
+        // 遥控器 OK 键 / Enter 键触发点击
+        if (event is KeyDownEvent &&
+            RemoteControlUtils.isSelectKey(event.logicalKey)) {
+          onPushDetail();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: _hasFocus
+            ? RemoteControlUtils.focusedBorderDecoration(
+                colorScheme: theme.colorScheme,
+              )
+            : null,
+        transform: _hasFocus
+            ? RemoteControlUtils.focusedTransform()
+            : Matrix4.identity(),
+        transformAlignment: Alignment.center,
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Card(
+              clipBehavior: Clip.hardEdge,
+              child: InkWell(
+                onTap: onPushDetail,
+                onLongPress: onLongPress,
+                onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: Style.aspectRatio,
+                      child: LayoutBuilder(
+                        builder: (context, boxConstraints) {
+                          double maxWidth = boxConstraints.maxWidth;
+                          double maxHeight = boxConstraints.maxHeight;
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              NetworkImgLayer(
+                                src: videoItem.cover,
+                                width: maxWidth,
+                                height: maxHeight,
+                                type: .emote,
                               ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
+                              if (videoItem.duration > 0)
+                                PBadge(
+                                  bottom: 6,
+                                  right: 7,
+                                  size: .small,
+                                  type: .gray,
+                                  text: DurationUtils.formatDuration(
+                                    videoItem.duration,
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    content(context),
+                  ],
                 ),
-                content(context),
-              ],
+              ),
             ),
-          ),
+            if (videoItem.goto == 'av')
+              Positioned(
+                right: -5,
+                bottom: -2,
+                width: 29,
+                height: 29,
+                child: VideoPopupMenu(
+                  iconSize: 17,
+                  videoItem: videoItem,
+                  onRemove: widget.onRemove,
+                ),
+              ),
+          ],
         ),
-        if (videoItem.goto == 'av')
-          Positioned(
-            right: -5,
-            bottom: -2,
-            width: 29,
-            height: 29,
-            child: VideoPopupMenu(
-              iconSize: 17,
-              videoItem: videoItem,
-              onRemove: onRemove,
-            ),
-          ),
-      ],
+      ),
     );
   }
 

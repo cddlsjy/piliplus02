@@ -19,6 +19,7 @@ import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
+import 'package:PiliPlus/utils/remote_control_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -485,7 +486,33 @@ class _MainAppState extends PopScopeState<MainApp>
       );
     }
 
-    return child;
+    // 全局遥控器按键处理：左右方向键切换底部导航 Tab
+    return Focus(
+      autofocus: true,
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        final key = event.logicalKey;
+        final navBars = _mainController.navigationBars;
+        if (navBars.length <= 1) return KeyEventResult.ignored;
+
+        if (key == LogicalKeyboardKey.arrowLeft) {
+          final current = _mainController.selectedIndex.value;
+          if (current > 0) {
+            _mainController.setIndex(current - 1);
+            return KeyEventResult.handled;
+          }
+        } else if (key == LogicalKeyboardKey.arrowRight) {
+          final current = _mainController.selectedIndex.value;
+          if (current < navBars.length - 1) {
+            _mainController.setIndex(current + 1);
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: child,
+    );
   }
 
   Widget _buildIcon({required NavigationBarType type, bool selected = false}) {
