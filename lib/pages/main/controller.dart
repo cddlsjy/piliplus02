@@ -161,7 +161,7 @@ class MainController extends GetxController
             PageUtils.toVideoPage(
               aid: aid,
               bvid: bvid,
-              cid: lastItem.history.cid,
+              cid: lastItem.history.cid ?? 0,
               cover: lastItem.cover,
               title: lastItem.title,
               progress: progress,

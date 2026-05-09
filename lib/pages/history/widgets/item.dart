@@ -255,7 +255,7 @@ class _HistoryItemState extends State<HistoryItem> {
                       ),
                     ),
                   PopupMenuItem(
-                    onTap: () => onDelete(item.kid!, business!),
+                    onTap: () => widget.onDelete(item.kid!, business!),
                     height: 38,
                     child: const Row(
                       children: [
